@@ -2,12 +2,19 @@
 
 
 
-Subscriber:
+# Subscribers:
 * Intrinsic camera parameters sensor_msgs::CameraInfo
 * Polygon of the object detected: geometry_msgs::Polygon
+* Status of the detection: std_msgs::Int8
 
-Publisher:
+# Publisher:
 * Command velocities in geometry_msgs::TwistStamped
+
+
+To detect and track an object you can use ROS OpenTLD:
+https://github.com/pandora-auth-ros-pkg/open_tld
+https://github.com/jokla/pandora_tld
+
 
 An Image-Based Visual Servoing is implemented to follow an object. The current visual features that are used are s = (x, log(Z/Z*)). The desired one are s* = (x*, 0), with:
 
@@ -22,9 +29,6 @@ The value of Z is estimated from the area of the bounding box that is proportion
 For the Visual Servoing I used ViSP:
 https://visp.inria.fr/
 
-To detect and track the object ROS OpenTLD is used:
-https://github.com/pandora-auth-ros-pkg/open_tld
-https://github.com/pandora-auth-ros-pkg/pandora_tld
 
 
 To launch:
