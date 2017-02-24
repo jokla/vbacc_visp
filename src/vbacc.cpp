@@ -10,7 +10,7 @@
 #include "vbacc.h"
 
 
-vbacc::vbacc(ros::NodeHandle &nh): m_cam(),  m_camInfoIsInitialized(false)
+vbacc::vbacc(ros::NodeHandle &nh): m_cam(),  m_camInfoIsInitialized(false), m_width(640), m_height(480)
 {
   // read in config options
   n = nh;
@@ -19,12 +19,21 @@ vbacc::vbacc(ros::NodeHandle &nh): m_cam(),  m_camInfoIsInitialized(false)
 
   n.param( "frequency", m_freq, 20);
   n.param<std::string>("cameraInfoName", m_cameraInfoName, "/camera/camera_info");
-  n.param<std::string>("ObjectPolygonTopicName", m_objectPolygonTopicName, "/vision/predator_alert");
+  n.param<std::string>("objectPolygonTopicName", m_objectPolygonTopicName, "/vision/predator_alert");
+  n.param<std::string>("cmdVelTopicName", m_cmdVelTopicName, "/cmd_vel");
+
+  n.param<std::string>("objectStatusPolygonTopicName", m_statusObjectPolygonTopicName, "/vision/predator_alert/status");
+
+  m_cameraInfoSub = n.subscribe( m_cameraInfoName, 1, (boost::function < void(const sensor_msgs::CameraInfoConstPtr & )>) boost::bind( &vbacc::getCameraInfoCb, this, _1 ));
+
   m_statusObjectPolygonSub = n.subscribe( m_statusObjectPolygonTopicName, 1, (boost::function < void(const std_msgs::Int8::ConstPtr & )>) boost::bind( &vbacc::getStatusObjectPolygonCb, this, _1 ));
   m_ObjectPolygonSub = n.subscribe( m_objectPolygonTopicName, 1, (boost::function < void(const geometry_msgs::Polygon::ConstPtr & )>) boost::bind( &vbacc::getObjectPolygonCb, this, _1 ));
 
-  m_cmdVelPub  = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
+  m_cmdVelPub  = n.advertise<geometry_msgs::Twist>(m_cmdVelTopicName, 1000);
 
+  I.resize(m_height, m_width, 0);
+  d.init(I);
+  vpDisplay::setTitle(I, "ViSP viewer");
 
 }
 
@@ -63,6 +72,25 @@ void  vbacc::initializationVS()
   // Add the feature
   m_base_poly_task.addFeature(m_s_Z, m_s_Zd);
 
+  // vx and vy
+  m_eJe.resize(6,2);
+  m_eJe[0][0]= 1;
+  m_eJe[5][1]= 1;
+
+  m_cMe.eye();
+  // Position of the camera in the mobile platform frame
+  double l_y = 0.25; // distance between the camera frame and the car frame (along y-cam)
+  double l_z = -1.0; // distance between the camera frame and the car frame (along z-cam)
+
+  vpTranslationVector cte; // meters
+  vpRxyzVector        cre; // radian
+  cte.set(0, l_y, l_z);
+  cre.buildFrom(vpMath::rad(90.), 0, vpMath::rad(90.));
+  m_cMe.buildFrom(cte, vpRotationMatrix(cre));
+
+  std::cout << "cMe:" << m_cMe << std::endl;
+
+  std::cout << "Visual Servoing initialized" << std::endl;
 
 }
 
@@ -145,23 +173,20 @@ bool vbacc::computeBaseTLDControlLaw()
       first_time = false;
     }
 
-    //    vpPoint P;
-    //    P.setWorldCoordinates(0.05/2, 0.05/2, -0.15/2);
-    //    P.project(m_cMdh);
-    //    double u=0, v=0;
-    //    vpMeterPixelConversion::convertPoint(m_cam, P.get_x(), P.get_y(), u, v);
-
     m_head_cog_cur = m_obj_polygon.getCenter();
 
     vpDisplay::displayCross(I, m_head_cog_des, 10, vpColor::red);
     vpDisplay::displayCross(I, m_head_cog_cur, 10, vpColor::green);
 
 
-    //std::cout << "m_head_cog_des" << m_head_cog_des << std::endl;
-    //std::cout << "m_head_cog_cur" << m_head_cog_cur << std::endl;
+    std::cout << "m_head_cog_des" << m_head_cog_des << std::endl;
+    std::cout << "m_head_cog_cur" << m_head_cog_cur << std::endl;
+
+    std::cout << "m_eJe:" << m_eJe << std::endl;
+
 
     m_base_poly_task.set_eJe( m_eJe );
-    m_base_poly_task.set_cVe( vpVelocityTwistMatrix(m_eMc.inverse()) );
+    m_base_poly_task.set_cVe( vpVelocityTwistMatrix(m_cMe) );
 
     // Compute distanze box camera
     double surface = 1./sqrt(m_obj_polygon.getArea()/(m_cam.get_px()*m_cam.get_py()));
@@ -176,8 +201,11 @@ bool vbacc::computeBaseTLDControlLaw()
 
     m_base_vel = m_base_poly_task.computeControlLaw(vpTime::measureTimeSecond() - m_servo_time_init);
 
-    //std::cout << "  ERROR:  " <<   m_base_poly_task.getError() << std::endl;
-    //std::cout << "  m_base_vel:  " <<   m_base_vel << std::endl;
+    this->publishCmdVel();
+
+
+    std::cout << "  ERROR:  " <<   m_base_poly_task.getError() << std::endl;
+    std::cout << "  m_base_vel:  " <<   m_base_vel << std::endl;
 
   }
   else
@@ -197,6 +225,9 @@ void vbacc::getCameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg)
   // Convert the paramenter in the visp format
   m_cam = visp_bridge::toVispCameraParameters(*msg);
   m_cam.printParameters();
+
+  m_width = msg->width;
+  m_height = msg->height;
 
   // Stop the subscriber (we don't need it anymore)
   this->m_cameraInfoSub.shutdown();

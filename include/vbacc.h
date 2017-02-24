@@ -50,6 +50,10 @@ protected:
   //Display
   vpImage<unsigned char> I;
   vpDisplayX d;
+  int m_width;
+  int m_height;
+
+  vpCameraParameters m_cam;
 
   // ROS
   ros::NodeHandle n;
@@ -57,6 +61,7 @@ protected:
   std::string m_cameraInfoName;
   std::string m_statusObjectPolygonTopicName;
   std::string m_objectPolygonTopicName;
+  std::string  m_cmdVelTopicName;
   ros::Subscriber m_cameraInfoSub;
   ros::Subscriber m_ObjectPolygonSub;
   ros::Subscriber m_statusObjectPolygonSub;
@@ -64,7 +69,7 @@ protected:
   int m_freq;
   int m_mode;
 
-  vpCameraParameters m_cam;
+
 
 
   double m_servo_time_init;
@@ -85,7 +90,7 @@ protected:
   vpMatrix m_eJe;
   vpImagePoint m_head_cog_des;
   vpImagePoint m_head_cog_cur;
-  vpHomogeneousMatrix m_eMc;
+  vpHomogeneousMatrix m_cMe;
   double m_Z;
   double m_Zd;
   vpColVector m_base_vel;
