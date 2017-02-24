@@ -29,11 +29,8 @@ vbacc::vbacc(ros::NodeHandle &nh): m_cam(),  m_camInfoIsInitialized(false), m_wi
   m_statusObjectPolygonSub = n.subscribe( m_statusObjectPolygonTopicName, 1, (boost::function < void(const std_msgs::Int8::ConstPtr & )>) boost::bind( &vbacc::getStatusObjectPolygonCb, this, _1 ));
   m_ObjectPolygonSub = n.subscribe( m_objectPolygonTopicName, 1, (boost::function < void(const geometry_msgs::Polygon::ConstPtr & )>) boost::bind( &vbacc::getObjectPolygonCb, this, _1 ));
 
-  m_cmdVelPub  = n.advertise<geometry_msgs::Twist>(m_cmdVelTopicName, 1000);
+  m_cmdVelPub  = n.advertise<geometry_msgs::TwistStamped>(m_cmdVelTopicName, 1000);
 
-  I.resize(m_height, m_width, 0);
-  d.init(I);
-  vpDisplay::setTitle(I, "ViSP viewer");
 
 }
 
@@ -44,17 +41,21 @@ vbacc::~vbacc(){
 
 void  vbacc::initializationVS()
 {
+  I.resize(m_height, m_width, 0);
+  d.init(I);
+  vpDisplay::setTitle(I, "ViSP viewer");
+
   // Visual Servoing using the COGx and the Area of the polygon
   m_base_poly_task.setServo(vpServo::EYEINHAND_L_cVe_eJe) ;
   m_base_poly_task.setInteractionMatrixType(vpServo::DESIRED, vpServo::PSEUDO_INVERSE);
   //    vpAdaptiveGain lambda_adapt;
   //    lambda_adapt.initStandard(1.6, 1.8, 15);
-  vpAdaptiveGain lambda_base(1.2, 1.0, 10);
+  vpAdaptiveGain lambda_base(3.2, 2.0, 24);
   m_base_poly_task.setLambda(lambda_base) ;
 
   vpImagePoint ip;
-  ip.set_uv(291.5,279.5);
-  m_head_cog_des.set_uv(291.5,279.5);
+  ip.set_uv(m_width/2., m_height/2.);
+  m_head_cog_des.set_uv(m_width/2., m_height/2.);
   // Create the current x visual feature
   vpFeatureBuilder::create(m_s, m_cam, ip);
   vpFeatureBuilder::create(m_sd, m_cam, ip);
@@ -62,8 +63,8 @@ void  vbacc::initializationVS()
   // Add the feature
   m_base_poly_task.addFeature(m_s, m_sd, vpFeaturePoint::selectX()) ;
 
-  m_coeff = 0.08652971743;
-  m_Z = 0.45;
+  m_coeff = 1.74;
+  m_Z = 6.0;
   m_Zd = m_Z;
 
   m_s_Z.buildFrom(m_s.get_x(), m_s.get_y(), m_Z , 0); // log(Z/Z*) = 0 that's why the last parameter is 0
@@ -131,16 +132,17 @@ void vbacc::spin()
     //std::cout << "u:" << m_obj_polygon.getCenter().get_u() << std::endl;
     // std::cout << "v:" << m_obj_polygon.getCenter().get_v() << std::endl;
     // std::cout << "m_obj_polygon.getCenter():" <<   m_obj_polygon.getCenter() << std::endl;
-
-    //  double surface = 1./sqrt(m_obj_polygon.getArea()/(m_cam.get_px()*m_cam.get_py()));
-    // std::cout << "surface: " << surface << std::endl;
-    //  std::cout << "dist: " << surface*m_coeff << std::endl;
+    //double surface = 1./sqrt(m_obj_polygon.getArea()/(m_cam.get_px()*m_cam.get_py()));
+    //std::cout << "surface: " << surface << std::endl;
+    //std::cout << "dist: " << m_coeff * surface << std::endl;
     //std::cout << "coeff: " << 0.58/surface << std::endl;
 
     if (m_servo_enabled && !this->computeBaseTLDControlLaw())
       vpDisplay::displayText(I, 30, 30, "Servo Base TDL enabled", vpColor::green);
     else
     {
+      this->publishCmdVelStop();
+
       vpDisplay::displayText(I, 30, 30, "Middle click to enable the base VS", vpColor::green);
     }
 
@@ -167,6 +169,7 @@ bool vbacc::computeBaseTLDControlLaw()
   if ( m_status_obj_polygon == 1 )
   {
     static bool first_time = true;
+
     if (first_time) {
       std::cout << "-- Start visual servoing of the base" << std::endl;
       m_servo_time_init = vpTime::measureTimeSecond();
