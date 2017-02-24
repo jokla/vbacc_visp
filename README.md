@@ -11,7 +11,7 @@
 * Command velocities in `geometry_msgs::TwistStamped`
 
 
-To detect and track an object you can use ROS OpenTLD:
+To detect and track an object you can use ROS OpenTLD:   
 https://github.com/pandora-auth-ros-pkg/open_tld
 https://github.com/jokla/pandora_tld
 
