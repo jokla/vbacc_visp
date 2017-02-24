@@ -3,12 +3,12 @@
 
 
 # Subscribers:
-* Intrinsic camera parameters sensor_msgs::CameraInfo
-* Polygon of the object detected: geometry_msgs::Polygon
-* Status of the detection: std_msgs::Int8
+* Intrinsic camera parameters `sensor_msgs::CameraInfo`
+* Polygon of the object detected: `geometry_msgs::Polygon`
+* Status of the detection: `std_msgs::Int8`
 
 # Publisher:
-* Command velocities in geometry_msgs::TwistStamped
+* Command velocities in `geometry_msgs::TwistStamped`
 
 
 To detect and track an object you can use ROS OpenTLD:
